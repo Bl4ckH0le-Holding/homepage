@@ -1,24 +1,42 @@
 const std = @import("std");
+const net = std.net;
+const Allocator = std.mem.Allocator;
+
+/// So this thing should manage HTTP routes that we serve.
+const Router = struct {
+    // How in the world do we store routes?
+};
+
+/// This represents a connection to the server.
+const Connection = struct {
+    // Should a connection have a reference to a router?
+};
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    // TODO(DCut): Use resolveIp instead?
+    const address = net.Address.parseIp("127.0.0.1", 80) catch unreachable;
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    var server = try net.Address.listen(address, .{
+        .kernel_backlog = 1024,
+        .reuse_address = true,
+    });
 
-    try bw.flush(); // don't forget to flush!
+    // Just spin up another thread to handle polling for new connections on the socket
+    const server_thread = try std.Thread.spawn(.{}, start_server, .{ allocator, &server });
+    server_thread.detach();
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+fn start_server(allocator: Allocator, server: *net.Server) !void {
+    defer server.deinit();
+
+    while (true) {
+        if (server.accept()) |conn| {
+            // Create a connection?
+        } else |err| {
+            std.debug.print("Error: {any}", .{err});
+        }
+    }
 }
